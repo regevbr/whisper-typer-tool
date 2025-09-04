@@ -24,7 +24,7 @@ CHANNELS = 1             # Mono for Whisper
 
 # Streaming configuration
 CHUNK_DURATION = 1.0     # Process audio every 1 second
-AUDIO_OVERLAP = 0.5      # 0.5 second overlap between chunks
+AUDIO_OVERLAP = 0.2      # 0.5 second overlap between chunks
 TEXT_OVERLAP_WINDOW = 50 # Check last 50 chars for text overlap
 MIN_NEW_TEXT = 1         # Minimum characters to type
 
@@ -163,18 +163,42 @@ class StreamingTranscriber:
         if not self.previous_text:
             return current_text
         
+        # Clean up text for comparison
+        current_clean = current_text.strip()
+        previous_clean = self.previous_text.strip()
+        
+        if not current_clean:
+            return ""
+        
+        # Check if current text is completely contained in what we already typed
+        if current_clean in self.total_typed_text:
+            return ""
+        
         # Look for common substring at the boundary
-        window = min(TEXT_OVERLAP_WINDOW, len(self.previous_text))
+        window = min(TEXT_OVERLAP_WINDOW, len(previous_clean))
         
         for i in range(window, 0, -1):
             # Check if end of previous matches start of current
-            prev_end = self.previous_text[-i:]
-            if current_text.startswith(prev_end):
+            prev_end = previous_clean[-i:]
+            if current_clean.startswith(prev_end):
                 # Found overlap - return only the new part
-                return current_text[i:]
+                new_part = current_clean[i:]
+                
+                # Additional check: don't add if new part is already in total typed text
+                if new_part.strip() and new_part.strip() not in self.total_typed_text:
+                    return new_part
+                return ""
         
-        # No overlap found at boundary - might be a complete replacement
-        # or correction, return the difference
+        # No overlap found - check if this is genuinely new content
+        # Split into words and check for semantic duplicates
+        current_words = set(current_clean.lower().split())
+        typed_words = set(self.total_typed_text.lower().split()[-20:])
+        
+        # If most words already exist, likely a rephrasing - skip it
+        overlap_ratio = len(current_words & typed_words) / max(len(current_words), 1)
+        if overlap_ratio > 0.7:  # 70% word overlap threshold
+            return ""
+        
         return current_text
     
     def finalize(self):
@@ -227,11 +251,8 @@ def recording_thread(audio_queue, stop_flag):
                 
                 if is_speech:
                     silence_duration = 0
-                    print("🎤", end="", flush=True)
                 else:
                     silence_duration += CHUNK_SIZE / SAMPLE_RATE
-                    print("🔇", end="", flush=True)
-                    
                     # Stop if silence detected for threshold duration
                     if silence_duration >= SILENCE_THRESHOLD:
                         print(f"\n🔇 Silence detected for {SILENCE_THRESHOLD}s, stopping...")

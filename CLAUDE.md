@@ -116,3 +116,41 @@ The system handles words split between audio chunks using a **dual-layer approac
 - **Model loading errors**: Early exit with clear error message
 - **Thread synchronization**: Timeout-based coordination
 - **Transcription errors**: Continue processing, log errors
+
+## Key Implementation Details
+
+### Text Deduplication Logic (`find_new_content`)
+The most critical function for preventing duplicate text output:
+
+1. **Complete duplicate check**: Skips if current text already exists in `total_typed_text`
+2. **Boundary overlap detection**: Finds common substrings at chunk boundaries
+3. **Semantic duplicate detection**: Uses 70% word overlap threshold on last 20 words
+4. **Smart filtering**: Only types genuinely new content
+
+### Audio Input Processing
+- Uses cross-platform clipboard pasting (`Ctrl+V`) for reliable text insertion
+- Handles both pyperclip and fallback character-by-character typing
+- Audio normalization: `int16 → float32` with `INT16_MAX` scaling
+
+### Whisper Integration
+- CPU-optimized with `device="cpu"` and `compute_type="int8"`
+- Context preservation using last 200 characters as `initial_prompt`
+- VAD filtering enabled for better quality
+- `beam_size=1` for real-time performance
+
+## Common Development Tasks
+
+### Testing Audio Issues
+- ALSA warnings are normal and can be ignored
+- Jack server errors are expected when Jack is not running
+- Test with different microphone devices if audio input fails
+
+### Modifying Transcription Behavior
+- Adjust `SILENCE_THRESHOLD` for different pause sensitivities
+- Change `WHISPER_MODEL` size for accuracy vs speed trade-offs
+- Modify `TEXT_OVERLAP_WINDOW` for different deduplication sensitivity
+
+### Debugging Streaming Issues
+- Monitor `💬 New:` output to see what content is being typed
+- Check `total_typed_text` accumulation for deduplication logic
+- Observe `🎤`/`🔇` patterns for VAD behavior
