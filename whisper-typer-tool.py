@@ -117,7 +117,7 @@ def main():
             
             # Callbacks
             on_recording_stop=on_recording_stop,
-            on_realtime_transcription_update=type_text_realtime,
+            on_realtime_transcription_stabilized=type_text_realtime,
             
             # Performance settings
             use_microphone=True,

@@ -16,9 +16,9 @@ This is a real-time streaming voice-to-text typing tool that uses RealtimeSTT li
 sudo apt-get install python3 python3-pip git ffmpeg portaudio19-dev python3-dev
 
 # Install Python dependencies using uv (preferred)
-uv add -r requirements.txt
+uv sync
 
-# Alternative with pip
+# Alternative with pip (if requirements.txt exists)
 pip install -r requirements.txt
 ```
 
@@ -74,7 +74,7 @@ webrtc_sensitivity = 2           # WebRTC VAD aggressiveness (0-3)
 realtime_processing_pause = 0.2  # Update frequency (seconds)
 post_speech_silence_duration = 4 # Silence threshold for stopping
 enable_realtime_transcription = True  # Enable live transcription
-realtime_model_type = "tiny"     # Fast model for real-time updates
+realtime_model_type = "base"     # Model for real-time updates (matches WHISPER_MODEL)
 ```
 
 ### Built-in Features
@@ -97,13 +97,13 @@ RealtimeSTT provides these capabilities automatically:
 
 ## Key Implementation Details
 
-### Text Deduplication Logic (`type_text_incremental`)
+### Text Deduplication Logic (`type_text_realtime`)
 Simple and effective approach for preventing duplicate text output:
 
 1. **String comparison**: Checks if new text starts with already typed text
 2. **Length-based filtering**: Only types genuinely new content
 3. **Whitespace handling**: Filters out empty or whitespace-only additions
-4. **Global tracking**: Uses global `typed_text` variable to track progress
+4. **Global tracking**: Uses global `last_typed_text` variable to track progress
 
 ### Cross-Platform Text Input
 - Uses pyperclip + `Ctrl+V` for reliable text insertion across platforms
@@ -113,7 +113,7 @@ Simple and effective approach for preventing duplicate text output:
 
 ### RealtimeSTT Integration
 - CPU-optimized with `device="cpu"` and `compute_type="int8"`  
-- Real-time model uses "tiny" for speed, final transcription uses "base" for accuracy
+- Uses same model (base) for both real-time and final transcription for consistency
 - Dual VAD system for robust speech detection
 - Automatic audio format conversion and sample rate handling
 
@@ -135,4 +135,4 @@ Simple and effective approach for preventing duplicate text output:
 - Monitor `💬 New:` output to see what content is being typed
 - Check RealtimeSTT logs for audio processing issues
 - Verify clipboard functionality with `pyperclip.paste()` in Python console
-- Use `realtime_model_type="base"` for better real-time accuracy (slower)
+- Use `realtime_model_type="small"` or `realtime_model_type="medium"` for better real-time accuracy (slower)
