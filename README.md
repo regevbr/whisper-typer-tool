@@ -45,3 +45,42 @@ pip install uv
 **Step 5:**
 
     uv run whisper-typer-tool.py
+
+## Background Process Script
+
+For convenient keyboard shortcut access, use the included `stt-toggle.sh` script:
+
+This script:
+- Sets up the Python environment (pyenv)
+- Changes to the script's directory automatically
+- Runs the tool in the background (`&`)
+- Detaches it from the terminal (`disown`)
+
+### Setting Up Keyboard Shortcut
+
+**Linux (GNOME):**
+1. Open Settings → Keyboard → Keyboard Shortcuts → Custom Shortcuts
+2. Click "+" to add new shortcut
+3. Name: "Voice Typing"
+4. Command: `/path/to/whisper-typer-tool/stt-toggle.sh`
+5. Click "Set Shortcut" and press your desired key combination (e.g., Ctrl+Alt+V)
+
+**Linux (KDE):**
+1. System Settings → Shortcuts → Custom Shortcuts
+2. Right-click → New → Global Shortcut → Command/URL
+3. Name: "Voice Typing"
+4. Command: `/path/to/whisper-typer-tool/stt-toggle.sh`
+5. Set trigger key combination
+
+**Windows:**
+1. Right-click `stt-toggle.sh` → Create shortcut
+2. Right-click shortcut → Properties → Shortcut tab
+3. Click in "Shortcut key" field and press desired combination
+4. Click OK
+
+**macOS:**
+1. System Preferences → Keyboard → Shortcuts → App Shortcuts
+2. Click "+" → All Applications
+3. Menu Title: (leave blank)
+4. Keyboard Shortcut: Press desired combination
+5. Use Automator to create a service that runs the shell script
