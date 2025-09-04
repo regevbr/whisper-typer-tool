@@ -2,8 +2,5 @@ pynput
 pyperclip
 pyaudio
 setuptools-rust
-faster-whisper
-webrtcvad
+RealtimeSTT
 numpy
-librosa
-soundfile
