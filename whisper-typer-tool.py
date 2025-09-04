@@ -1,163 +1,207 @@
-from pynput import keyboard
-import codecs
-import whisper
+#!/usr/bin/env python3
+
+import sys
 import time
-import subprocess
-import threading
 import pyaudio
 import wave
-import os
-from datetime import datetime
+import numpy as np
+import webrtcvad
+from pynput import keyboard
+from faster_whisper import WhisperModel
 
-#load model
-#model selection -> (tiny base small medium large)
-print("loading model...")
-model_name = "base"
-model = whisper.load_model(model_name)
-# Replace playsound with pyaudio for sound playback
+
+# Global keyboard controller
+pykeyboard = keyboard.Controller()
+
+# Configuration
+WHISPER_MODEL = "base"
+SILENCE_THRESHOLD = 4  # seconds before auto-stop
+VAD_AGGRESSIVENESS = 2   # 0-3, higher = more aggressive silence detection
+SAMPLE_RATE = 16000      # 16kHz for optimal Whisper performance
+CHUNK_SIZE = 320         # 20ms chunks for VAD (16000 * 0.02)
+CHANNELS = 1             # Mono for Whisper
+
+
 def play_audio_file(filename):
-    # Create a PyAudio object
-    audio = pyaudio.PyAudio()
-    
-    # Open the wave file
-    wf = wave.open(filename, 'rb')
-    
-    # Get the audio format
-    stream = audio.open(
-        format=audio.get_format_from_width(wf.getsampwidth()),
-        channels=wf.getnchannels(),
-        rate=wf.getframerate(),
-        output=True
-    )
-    
-    # Read data and play
-    data = wf.readframes(1024)
-    while data:
-        stream.write(data)
+    """Play audio file using pyaudio"""
+    try:
+        audio = pyaudio.PyAudio()
+        wf = wave.open(filename, 'rb')
+        
+        stream = audio.open(
+            format=audio.get_format_from_width(wf.getsampwidth()),
+            channels=wf.getnchannels(),
+            rate=wf.getframerate(),
+            output=True
+        )
+        
         data = wf.readframes(1024)
+        while data:
+            stream.write(data)
+            data = wf.readframes(1024)
+        
+        stream.stop_stream()
+        stream.close()
+        wf.close()
+        audio.terminate()
+    except Exception as e:
+        print(f"Warning: Could not play audio file {filename}: {e}")
+
+
+def type_text_live(text):
+    """Type text at current cursor position"""
+    if not text or not text.strip():
+        return
+        
+    for char in text:
+        try:
+            pykeyboard.type(char)
+            time.sleep(0.003)  # Slight delay for smooth typing
+        except:
+            print(f"Warning: Could not type character: {char}")
+
+
+def record_with_silence_detection():
+    """Record audio until silence is detected"""
+    print("Loading Whisper model...")
+    try:
+        # Initialize Whisper model for CPU to avoid CUDA issues
+        model = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8")
+        print(f"{WHISPER_MODEL} model loaded")
+    except Exception as e:
+        print(f"Error loading Whisper model: {e}")
+        sys.exit(1)
     
-    # Cleanup
-    stream.stop_stream()
-    stream.close()
-    audio.terminate()
-
-# Play the sound when model is loaded
-play_audio_file("model_loaded.wav")
-print(f"{model_name} model loaded")
-
-file_ready_counter=0
-stop_recording=False
-is_recording=False
-pykeyboard= keyboard.Controller()
-
-def transcribe_speech():
-    global file_ready_counter
-    i=1
-    print("ready - start transcribing with F2 ...\n")
-    while True:
-        while file_ready_counter<i:
-            time.sleep(0.01)
-
-        result = model.transcribe("test"+str(i)+".wav")
-        print(result["text"]+"\n")
-        now = str(datetime.now()).split(".")[0]
-        with codecs.open('transcribe.log', 'a', encoding='utf-8') as f:
-            f.write(now+" : "+result["text"]+"\n")       
-        for element in result["text"]:
-            try:
-                pykeyboard.type(element)
-                time.sleep(0.0025)
-            except:
-                print("empty or unknown symbol")        
-        os.remove("test"+str(i)+".wav")
-        i=i+1
-
-#keyboard events
-pressed = set()
-
-COMBINATIONS = [
-    {
-        "keys": [
-            #{keyboard.Key.ctrl ,keyboard.Key.shift, keyboard.KeyCode(char="r")},
-            #{keyboard.Key.ctrl ,keyboard.Key.shift, keyboard.KeyCode(char="R")},
-            {keyboard.Key.menu},
-        ],
-        "command": "start record",
-    },
-]
-
-#------------
-
-#record audio
-def record_speech():
-    global file_ready_counter
-    global stop_recording
-    global is_recording
-
-    is_recording=True
-    chunk = 1024  # Record in chunks of 1024 samples
-    sample_format = pyaudio.paInt16  # 16 bits per sample
-    channels = 2
-    fs = 44100  # Record at 44100 samples per second
-    p = pyaudio.PyAudio()  # Create an interface to PortAudio
-    stream = p.open(format=sample_format,
-                channels=channels,
-                rate=fs,
-                frames_per_buffer=chunk,
-                input=True)
-
-    frames = []  # Initialize array to store frames
-
-    print("Start recording...\n")
+    # Initialize WebRTC VAD for silence detection
+    try:
+        vad = webrtcvad.Vad(VAD_AGGRESSIVENESS)
+    except Exception as e:
+        print(f"Error initializing VAD: {e}")
+        sys.exit(1)
+    
+    # Start recording immediately
+    print("Start speaking...")
     play_audio_file("on.wav")
-
-    while stop_recording==False:
-        data = stream.read(chunk)
-        frames.append(data)
-
-    # Stop and close the stream
-    stream.stop_stream()
-    stream.close()
-    p.terminate()
-    play_audio_file("off.wav")
-    print('Finish recording')
-
-    # Save the recorded data as a WAV file
-    wf = wave.open("test"+str(file_ready_counter+1)+".wav", 'wb')
-    wf.setnchannels(channels)
-    wf.setsampwidth(p.get_sample_size(sample_format))
-    wf.setframerate(fs)
-    wf.writeframes(b''.join(frames))
-    wf.close()
-
-    stop_recording=False
-    is_recording=False
-    file_ready_counter=file_ready_counter+1
-
-#------------
-
-#transcribe speech in infinte loop
-t2 = threading.Thread(target=transcribe_speech)
-t2.start()
-
-#hot key events
-def on_press(key):
-    pressed.add(key)
-
-def on_release(key):
-    global pressed
-    global stop_recording
-    global is_recording
-    for c in COMBINATIONS:
-        for keys in c["keys"]:
-            if keys.issubset(pressed):
-                if c["command"]=="start record" and stop_recording==False and is_recording==False:
-                    t1 = threading.Thread(target=record_speech)
-                    t1.start()
+    
+    # Initialize PyAudio
+    p = pyaudio.PyAudio()
+    stream = None
+    
+    try:
+        stream = p.open(
+            format=pyaudio.paInt16,
+            channels=CHANNELS,
+            rate=SAMPLE_RATE,
+            input=True,
+            frames_per_buffer=CHUNK_SIZE
+        )
+        
+        silence_duration = 0
+        audio_chunks = []
+        chunk_count = 0
+        
+        print("🎤 Recording... (pause for 1.5s to stop)")
+        
+        while True:
+            # Read audio chunk
+            try:
+                chunk_data = stream.read(CHUNK_SIZE, exception_on_overflow=False)
+                chunk_count += 1
+                audio_chunks.append(chunk_data)
+            except Exception as e:
+                print(f"Error reading audio: {e}")
+                break
+            
+            # Check for speech using VAD (every 20ms)
+            try:
+                is_speech = vad.is_speech(chunk_data, SAMPLE_RATE)
+            except:
+                is_speech = True  # Assume speech if VAD fails
+            
+            if is_speech:
+                silence_duration = 0
+                if chunk_count % 50 == 0:  # Show activity every ~1 second
+                    print("🎤", end="", flush=True)
+            else:
+                silence_duration += CHUNK_SIZE / SAMPLE_RATE  # 20ms per chunk
+                if chunk_count % 50 == 0:  # Show silence every ~1 second
+                    print("🔇", end="", flush=True)
+            
+            # Stop if silence detected for threshold duration
+            if silence_duration >= SILENCE_THRESHOLD:
+                print(f"\n🔇 Silence detected for {SILENCE_THRESHOLD}s, stopping...")
+                break
+        
+        print("\n🎯 Processing transcription...")
+        
+        # Convert collected audio to format suitable for Whisper
+        if audio_chunks:
+            # Combine all chunks
+            audio_data = b''.join(audio_chunks)
+            
+            # Convert to numpy array and normalize
+            audio_np = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32) / 32768.0
+            
+            # Transcribe using Whisper
+            try:
+                segments, info = model.transcribe(audio_np, beam_size=5)
+                
+                print(f"Detected language '{info.language}' with probability {info.language_probability:.2f}")
+                
+                # Collect all text
+                full_text = ""
+                for segment in segments:
+                    full_text += segment.text
+                
+                if full_text.strip():
+                    print(f"💬 Transcription: {full_text}")
+                    
+                    # Type the text
+                    type_text_live(full_text)
+                    
+                    print("✅ Text typed successfully")
                 else:
-                    if c["command"]=="start record" and is_recording==True:
-                        stop_recording=True
-                pressed = set()
+                    print("⚠️ No speech detected in recording")
+                
+            except Exception as e:
+                print(f"Error during transcription: {e}")
+                
+    except Exception as e:
+        print(f"Error during recording: {e}")
+    
+    finally:
+        # Cleanup
+        if stream:
+            try:
+                stream.stop_stream()
+                stream.close()
+            except:
+                pass
+        
+        try:
+            p.terminate()
+        except:
+            pass
+        
+        play_audio_file("off.wav")
+        print("🎯 Recording complete")
 
-with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
-    listener.join()
+
+def main():
+    """Main entry point"""
+    try:
+        record_with_silence_detection()
+    except KeyboardInterrupt:
+        print("\n⚠️ Interrupted by user")
+        play_audio_file("off.wav")
+    except Exception as e:
+        print(f"Fatal error: {e}")
+        play_audio_file("off.wav")
+        sys.exit(1)
+    
+    print("✅ Exiting...")
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()

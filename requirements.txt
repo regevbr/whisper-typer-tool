@@ -1,4 +1,8 @@
 pynput
 pyaudio
 setuptools-rust
-git+https://github.com/openai/whisper.git
+faster-whisper
+webrtcvad
+numpy
+librosa
+soundfile
