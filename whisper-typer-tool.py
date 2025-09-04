@@ -12,7 +12,7 @@ from datetime import datetime
 #load model
 #model selection -> (tiny base small medium large)
 print("loading model...")
-model_name = "tiny"
+model_name = "base"
 model = whisper.load_model(model_name)
 # Replace playsound with pyaudio for sound playback
 def play_audio_file(filename):
@@ -80,7 +80,7 @@ COMBINATIONS = [
         "keys": [
             #{keyboard.Key.ctrl ,keyboard.Key.shift, keyboard.KeyCode(char="r")},
             #{keyboard.Key.ctrl ,keyboard.Key.shift, keyboard.KeyCode(char="R")},
-            {keyboard.Key.f2},
+            {keyboard.Key.menu},
         ],
         "command": "start record",
     },

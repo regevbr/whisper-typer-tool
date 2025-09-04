@@ -1,0 +1,15 @@
+[project]
+name = "whisper-typer-tool"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "openai-whisper",
+    "pyaudio>=0.2.14",
+    "pynput>=1.8.1",
+    "setuptools-rust>=1.12.0",
+]
+
+[tool.uv.sources]
+openai-whisper = { git = "https://github.com/openai/whisper.git" }
