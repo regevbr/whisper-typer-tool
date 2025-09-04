@@ -2,6 +2,8 @@
 
 This is a real-time voice-to-text typing tool that uses [RealtimeSTT](https://github.com/KoljaB/RealtimeSTT) for efficient speech transcription. The application starts recording immediately when executed, provides live transcription feedback as you speak, automatically stops after detecting silence, and types the transcribed text at the current cursor position.
 
+**🔒 Privacy**: All speech recognition is handled locally using OpenAI's Whisper models - no data is sent to external servers or APIs. Complete offline operation.
+
 ## Features
 
 - **Real-time transcription**: Text appears as you speak with minimal latency

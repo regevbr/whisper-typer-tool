@@ -8,6 +8,8 @@ This is a real-time streaming voice-to-text typing tool that uses RealtimeSTT li
 
 **Key Architecture**: The project uses the RealtimeSTT library instead of custom chunking, which provides superior audio processing, dual VAD systems, and built-in streaming transcription capabilities.
 
+**Local Processing**: All speech recognition is handled locally using OpenAI's Whisper models - no data is sent to external servers or APIs. The application downloads and runs Whisper models directly on your machine for complete privacy and offline operation.
+
 ## Development Commands
 
 ### Setup and Installation
