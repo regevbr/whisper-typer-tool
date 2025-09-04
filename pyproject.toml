@@ -16,5 +16,6 @@ dependencies = [
     "pyautogui>=0.9.54",
     "pyperclip>=1.9.0",
     "realtimestt>=0.3.104",
+    "torch>=2.0.0",
 ]
 

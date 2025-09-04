@@ -42,23 +42,40 @@ uv run whisper-typer-tool.py
 
 # Alternative direct execution (if dependencies installed globally)
 python whisper-typer-tool.py
+
+# Run tests
+uv run run_tests.py
+# or
+python run_tests.py
+
+# Run performance benchmarks
+uv run benchmark.py
+# or
+python benchmark.py
 ```
 
 ### Configuration Changes
-The main configuration is at whisper-typer-tool.py:12-13:
+The main configuration is at whisper-typer-tool.py:7-8:
 - `WHISPER_MODEL`: Model size (tiny, base, small, medium, large)  
 - `SILENCE_THRESHOLD`: Seconds before auto-stop
 
 ## Architecture
 
-### Single-File Application Structure
+### Modular Application Structure
 
-The entire application is contained in `whisper-typer-tool.py` with these key components:
+The application is now organized into several modules for better maintainability:
 
-1. **Main Entry Point (`main()`)**: Initializes RealtimeSTT AudioToTextRecorder with callback configuration
-2. **Real-time Text Processing (`type_text_realtime()`)**: Handles incremental typing with text deduplication
-3. **Audio Feedback (`play_audio_file()`)**: Plays on.wav/off.wav for recording state changes
-4. **Text Correction Logic (`find_common_prefix_length()`)**: Calculates text differences for smart corrections
+1. **whisper-typer-tool.py**: Main entry point with configuration
+2. **app.py**: WhisperTyperApp class with proper resource management
+3. **audio.py**: AudioManager class for non-blocking audio playback
+4. **text_typing.py**: TypeController class with intelligent text correction
+5. **transcription.py**: TranscriptionHandler class with GPU/CPU auto-detection
+
+#### Key Components:
+- **AudioManager**: Handles audio playback with pre-initialization and threading
+- **TypeController**: Manages text typing with difflib-based corrections and debouncing  
+- **TranscriptionHandler**: Configures Whisper models with optimal device detection
+- **WhisperTyperApp**: Coordinates all components with proper resource cleanup
 
 ### RealtimeSTT Integration Pattern
 
@@ -66,7 +83,7 @@ The application leverages RealtimeSTT's AudioToTextRecorder as a context manager
 
 - **Dual VAD Configuration**: WebRTC (sensitivity 0-3) + Silero (sensitivity 0.0-1.0) 
 - **Callback-Driven Architecture**: `on_realtime_transcription_stabilized` → `type_text_realtime()`
-- **CPU Optimization**: Uses `device="cpu"` and `compute_type="int8"` for performance
+- **GPU/CPU Auto-Detection**: Automatically uses CUDA when available, fallback to CPU with int8
 - **Model Consistency**: Same model for both real-time and final transcription
 
 ### Text Processing Pipeline
@@ -108,7 +125,7 @@ language="en",                          # English language
 silero_sensitivity=0.4,                 # Speech detection threshold
 webrtc_sensitivity=2,                   # VAD aggressiveness  
 post_speech_silence_duration=SILENCE_THRESHOLD,  # Currently 4 seconds
-realtime_processing_pause=0.2,          # 200ms update frequency
+realtime_processing_pause=0.1,          # 100ms update frequency (optimized)
 enable_realtime_transcription=True,     # Live transcription enabled
 ```
 
