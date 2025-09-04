@@ -8,9 +8,8 @@ import numpy as np
 import webrtcvad
 import threading
 import queue
-from pynput import keyboard
 from faster_whisper import WhisperModel
-
+from pynput import keyboard
 
 # Global keyboard controller
 pykeyboard = keyboard.Controller()
@@ -63,16 +62,36 @@ def play_audio_file(filename):
 
 
 def type_text_live(text):
-    """Type text at current cursor position"""
+    """Type text at current cursor position using cross-platform clipboard method"""
     if not text or not text.strip():
         return
         
-    for char in text:
-        try:
-            pykeyboard.type(char)
-            time.sleep(0.003)  # Slight delay for smooth typing
-        except:
-            print(f"Warning: Could not type character: {char}")
+    try:
+        # Use pyperclip for cross-platform clipboard operations
+        import pyperclip
+        
+        # Copy our text to clipboard
+        pyperclip.copy(text)
+        
+        # Small delay to ensure clipboard is set
+        time.sleep(0.01)
+        
+        # Paste using Ctrl+V (cross-platform)
+        with pykeyboard.pressed(keyboard.Key.ctrl):
+            pykeyboard.press('v')
+            pykeyboard.release('v')
+            
+    except ImportError:
+        # Fallback to character-by-character typing if pyperclip not available
+        print("Warning: pyperclip not available, using character typing (may have issues with special chars)")
+        for char in text:
+            try:
+                pykeyboard.type(char)
+                time.sleep(0.003)
+            except Exception as e:
+                print(f"Warning: Could not type character '{char}': {e}")
+    except Exception as e:
+        print(f"Warning: Could not type text '{text}': {e}")
 
 
 class StreamingTranscriber:

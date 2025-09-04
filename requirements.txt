@@ -1,4 +1,5 @@
 pynput
+pyperclip
 pyaudio
 setuptools-rust
 faster-whisper
