@@ -9,7 +9,7 @@ import pyperclip
 from pynput import keyboard
 
 # Configuration
-WHISPER_MODEL = "base"
+WHISPER_MODEL = "tiny"
 SILENCE_THRESHOLD = 4    # seconds before auto-stop
 
 # Track what we've already typed to avoid duplicates
@@ -41,41 +41,73 @@ def play_audio_file(filename):
         print(f"Warning: Could not play audio file {filename}: {e}")
 
 
+def find_common_prefix_length(text1, text2):
+    """Find the length of the common prefix between two strings"""
+    min_length = min(len(text1), len(text2))
+    for i in range(min_length):
+        if text1[i] != text2[i]:
+            return i
+    return min_length
+
+
 def type_text_realtime(text):
-    """Type only new text from real-time transcription updates"""
+    """Type text with corrections, deleting and retyping changed portions"""
     global last_typed_text
     
     if not text or not text.strip():
         return
     
-    # Only type if this is new content
-    if text != last_typed_text and len(text) > len(last_typed_text):
-        # Extract only the new part
-        new_text = text[len(last_typed_text):]
+    # Skip if text is exactly the same
+    if text == last_typed_text:
+        print(f"💭 No change: '{text}' (skipping)")
+        return
+    
+    # Find the common prefix length
+    common_prefix_length = find_common_prefix_length(last_typed_text, text)
+    
+    try:
+        kb = keyboard.Controller()
         
-        if new_text.strip():  # Only type if there's actual new content
-            print(f"💬 New: '{new_text}'")
+        # If there's a difference, we need to correct the text
+        if common_prefix_length < len(last_typed_text):
+            # Calculate how many characters to delete (divergent part of old text)
+            chars_to_delete = len(last_typed_text) - common_prefix_length
             
-            try:
-                # Use pyperclip for cross-platform clipboard operations
-                pyperclip.copy(new_text)
-                
-                # Small delay to ensure clipboard is set
-                time.sleep(0.01)
-                
-                # Paste using Ctrl+V (cross-platform)
-                kb = keyboard.Controller()
-                with kb.pressed(keyboard.Key.ctrl):
-                    kb.press('v')
-                    kb.release('v')
-                
-                # Update what we've typed
-                last_typed_text = text
-                
-            except Exception as e:
-                print(f"Warning: Could not type text '{new_text}': {e}")
-    else:
-        print(f"💭 Duplicate: '{text}' (skipping)")
+            print(f"🔄 Correcting: deleting {chars_to_delete} chars, typing '{text[common_prefix_length:]}'")
+            
+            # Send backspace keystrokes to delete the divergent part
+            for _ in range(chars_to_delete):
+                kb.press(keyboard.Key.backspace)
+                kb.release(keyboard.Key.backspace)
+                time.sleep(0.001)  # Small delay between keystrokes
+            
+            # Type the corrected text after the common prefix
+            new_text_to_type = text[common_prefix_length:]
+        else:
+            # Text only got longer (append case)
+            new_text_to_type = text[common_prefix_length:]
+
+        # Type the new/corrected text if there is any
+        if new_text_to_type:
+
+            print(f"💬 Appending: '{new_text_to_type}'")
+
+            # Use pyperclip for cross-platform clipboard operations
+            pyperclip.copy(new_text_to_type)
+            
+            # Small delay to ensure clipboard is set
+            time.sleep(0.01)
+            
+            # Paste using Ctrl+V (cross-platform)
+            with kb.pressed(keyboard.Key.ctrl):
+                kb.press('v')
+                kb.release('v')
+        
+        # Update what we've typed
+        last_typed_text = text
+        
+    except Exception as e:
+        print(f"Warning: Could not type/correct text: {e}")
 
 
 def on_recording_stop():
@@ -121,6 +153,7 @@ def main():
             
             # Performance settings
             use_microphone=True,
+            no_log_file=True,
             spinner=False,                   # Disable spinner for cleaner output
             early_transcription_on_silence=1,    # Faster transcription on silence
         ) as recorder:
@@ -132,6 +165,8 @@ def main():
             recorder.start()
             # Record and get final text
             final_text = recorder.text()
+
+            type_text_realtime(final_text)
             
             print(f"\n✅ Complete transcription: '{final_text}'")
         
