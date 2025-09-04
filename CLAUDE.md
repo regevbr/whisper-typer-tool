@@ -6,133 +6,112 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a real-time streaming voice-to-text typing tool that uses RealtimeSTT library for efficient speech transcription. The application starts recording immediately when executed, provides live transcription feedback as you speak, automatically stops after detecting silence, and types the transcribed text at the current cursor position.
 
-**Key Change**: The project has been refactored from a custom chunking implementation to use the RealtimeSTT library, which provides superior audio processing, dual VAD systems, and built-in streaming transcription capabilities.
+**Key Architecture**: The project uses the RealtimeSTT library instead of custom chunking, which provides superior audio processing, dual VAD systems, and built-in streaming transcription capabilities.
 
 ## Development Commands
 
 ### Setup and Installation
 ```bash
 # System dependencies (Linux - Ubuntu, Debian)
-sudo apt-get install python3 python3-pip git ffmpeg portaudio19-dev python3-dev
+sudo apt-get install ffmpeg portaudio19-dev python3-dev
 
-# Install Python dependencies using uv (preferred)
+# System dependencies (Windows)
+# Download ffmpeg from https://ffmpeg.org/ and place ffmpeg.exe in project root
+# Install git from https://git-scm.com/download/win
+# Install Python from https://www.python.org/downloads/windows/
+
+# System dependencies (macOS)
+brew install ffmpeg portaudio python3
+
+# Install uv (if not already installed)
+pip install uv
+
+# Setup project with dependencies (preferred method)
 uv sync
 
-# Alternative with pip (if requirements.txt exists)
-pip install -r requirements.txt
+# Alternative setup from requirements.txt
+uv add -r requirements.txt
 ```
 
 ### Running the Application
 ```bash
-# Run with uv (preferred)
+# Primary method with uv
 uv run whisper-typer-tool.py
 
-# Alternative direct execution
+# Alternative direct execution (if dependencies installed globally)
 python whisper-typer-tool.py
 ```
 
+### Configuration Changes
+The main configuration is at whisper-typer-tool.py:12-13:
+- `WHISPER_MODEL`: Model size (tiny, base, small, medium, large)  
+- `SILENCE_THRESHOLD`: Seconds before auto-stop
+
 ## Architecture
 
-### Simplified RealtimeSTT Architecture
+### Single-File Application Structure
 
-The application now uses **RealtimeSTT library** which handles all complex audio processing internally:
+The entire application is contained in `whisper-typer-tool.py` with these key components:
 
-1. **Main Thread**: Initializes RealtimeSTT recorder with callbacks
-2. **RealtimeSTT Internal**: Handles audio capture, VAD, streaming transcription
-3. **Callback Functions**: Process transcription updates and type text
+1. **Main Entry Point (`main()`)**: Initializes RealtimeSTT AudioToTextRecorder with callback configuration
+2. **Real-time Text Processing (`type_text_realtime()`)**: Handles incremental typing with text deduplication
+3. **Audio Feedback (`play_audio_file()`)**: Plays on.wav/off.wav for recording state changes
+4. **Text Correction Logic (`find_common_prefix_length()`)**: Calculates text differences for smart corrections
 
-### Core Components
+### RealtimeSTT Integration Pattern
 
-#### RealtimeSTT AudioToTextRecorder
-- **Dual VAD System**: Uses both WebRTC VAD and Silero VAD for accurate speech detection
-- **Built-in Audio Processing**: Handles chunking, overlap, and streaming internally
-- **Real-time Callbacks**: Provides incremental transcription updates
-- **Automatic Stopping**: Stops after configurable silence duration
+The application leverages RealtimeSTT's AudioToTextRecorder as a context manager:
 
-#### Text Processing Pipeline
-1. **Speech Detection**: Dual VAD detects speech start/stop
-2. **Real-time Transcription**: Incremental transcription updates via callbacks
-3. **Text Deduplication**: Simple string comparison to avoid retyping
-4. **Cross-platform Typing**: Uses clipboard paste for reliable text insertion
+- **Dual VAD Configuration**: WebRTC (sensitivity 0-3) + Silero (sensitivity 0.0-1.0) 
+- **Callback-Driven Architecture**: `on_realtime_transcription_stabilized` → `type_text_realtime()`
+- **CPU Optimization**: Uses `device="cpu"` and `compute_type="int8"` for performance
+- **Model Consistency**: Same model for both real-time and final transcription
 
-#### Key Simplifications
-- **No manual threading**: RealtimeSTT handles all audio processing threads
-- **No chunk management**: Built-in overlap and boundary handling
-- **No VAD implementation**: Uses battle-tested VAD systems
-- **No audio format handling**: Automatic sample rate and format conversion
+### Text Processing Pipeline
 
-### Configuration Constants
+#### Real-time Text Correction (whisper-typer-tool.py:53-111)
+1. **Deduplication Check**: Skip if text unchanged from `last_typed_text`
+2. **Common Prefix Calculation**: Find divergence point between old and new text
+3. **Backspace Correction**: Delete divergent characters using keyboard simulation
+4. **Clipboard Insertion**: Copy new text to clipboard and paste with Ctrl+V
+5. **State Tracking**: Update global `last_typed_text` for next comparison
 
-```python
-# Core settings
-WHISPER_MODEL = "base"           # Model: tiny, base, small, medium, large  
-SILENCE_THRESHOLD = 4            # Seconds before auto-stop
+#### Cross-Platform Typing Strategy
+- **Primary Method**: pyperclip clipboard + Ctrl+V paste (works in all applications)
+- **Fallback**: Individual character typing via pynput (not implemented)
+- **Error Handling**: Graceful degradation with warning messages
 
-# RealtimeSTT Configuration
-silero_sensitivity = 0.4         # Silero VAD sensitivity (0.0-1.0)
-webrtc_sensitivity = 2           # WebRTC VAD aggressiveness (0-3)
-realtime_processing_pause = 0.2  # Update frequency (seconds)
-post_speech_silence_duration = 4 # Silence threshold for stopping
-enable_realtime_transcription = True  # Enable live transcription
-realtime_model_type = "base"     # Model for real-time updates (matches WHISPER_MODEL)
-```
+### Audio System Components
 
-### Built-in Features
+#### Audio Files (on.wav, off.wav)
+- Located in project root
+- Played via pyaudio during recording state changes
+- Error handling if files missing or audio system unavailable
 
-RealtimeSTT provides these capabilities automatically:
-
-1. **Smart Audio Processing**: Automatic chunking with optimal overlap
-2. **Word Boundary Detection**: Prevents word splits without manual intervention
-3. **Dual VAD System**: WebRTC for fast detection + Silero for accuracy
-4. **Real-time Feedback**: Incremental transcription as you speak
-5. **Automatic Stopping**: Configurable silence detection
-6. **Model Optimization**: Uses appropriate models for real-time vs final transcription
-
-### Error Handling Patterns
-
-- **Audio device failures**: RealtimeSTT handles gracefully with fallback options
-- **Model loading errors**: Clear error messages and early exit
-- **Transcription errors**: Built-in error handling with retry logic
-- **Keyboard input errors**: Fallback to character-by-character typing
+#### Audio Device Handling
+- RealtimeSTT manages microphone access automatically
+- ALSA warnings are normal and can be ignored on Linux
+- Fallback mechanisms handled internally by RealtimeSTT
 
 ## Key Implementation Details
 
-### Text Deduplication Logic (`type_text_realtime`)
-Simple and effective approach for preventing duplicate text output:
+### Global State Management
+- `last_typed_text`: Global string tracking what's been typed for deduplication
+- Reset on each new session in `main()`
 
-1. **String comparison**: Checks if new text starts with already typed text
-2. **Length-based filtering**: Only types genuinely new content
-3. **Whitespace handling**: Filters out empty or whitespace-only additions
-4. **Global tracking**: Uses global `last_typed_text` variable to track progress
+### Configuration Constants in AudioToTextRecorder
+```python
+model=WHISPER_MODEL,                    # Currently "tiny" for speed
+language="en",                          # English language
+silero_sensitivity=0.4,                 # Speech detection threshold
+webrtc_sensitivity=2,                   # VAD aggressiveness  
+post_speech_silence_duration=SILENCE_THRESHOLD,  # Currently 4 seconds
+realtime_processing_pause=0.2,          # 200ms update frequency
+enable_realtime_transcription=True,     # Live transcription enabled
+```
 
-### Cross-Platform Text Input
-- Uses pyperclip + `Ctrl+V` for reliable text insertion across platforms
-- Works in any application with text input (editors, browsers, terminals)
-- Small delay ensures clipboard is properly set before pasting
-- Error handling with detailed warning messages
-
-### RealtimeSTT Integration
-- CPU-optimized with `device="cpu"` and `compute_type="int8"`  
-- Uses same model (base) for both real-time and final transcription for consistency
-- Dual VAD system for robust speech detection
-- Automatic audio format conversion and sample rate handling
-
-## Common Development Tasks
-
-### Testing Audio Issues  
-- ALSA warnings are normal and can be ignored
-- First run may be slow due to model downloads (Silero VAD, Whisper models)
-- Test with different microphone devices if audio input fails
-- Check `pulseaudio` or `alsa` settings if no audio input detected
-
-### Modifying Transcription Behavior
-- Adjust `SILENCE_THRESHOLD` for different pause sensitivities
-- Change `WHISPER_MODEL` size for accuracy vs speed trade-offs
-- Modify `silero_sensitivity` and `webrtc_sensitivity` for VAD tuning
-- Change `realtime_processing_pause` for update frequency
-
-### Debugging Issues
-- Monitor `💬 New:` output to see what content is being typed
-- Check RealtimeSTT logs for audio processing issues
-- Verify clipboard functionality with `pyperclip.paste()` in Python console
-- Use `realtime_model_type="small"` or `realtime_model_type="medium"` for better real-time accuracy (slower)
+### Error Recovery Patterns
+- **Audio Errors**: Try-catch around audio operations with warning messages
+- **Keyboard Errors**: Try-catch around typing operations with fallback notifications  
+- **Model Loading**: Exception handling with sys.exit(1) on fatal errors
+- **Keyboard Interrupt**: Clean shutdown with audio feedback
