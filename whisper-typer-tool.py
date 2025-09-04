@@ -9,7 +9,7 @@ import pyperclip
 from pynput import keyboard
 
 # Configuration
-WHISPER_MODEL = "tiny"
+WHISPER_MODEL = "base"
 SILENCE_THRESHOLD = 4    # seconds before auto-stop
 
 # Track what we've already typed to avoid duplicates

@@ -5,6 +5,6 @@ export PATH="$PYENV_ROOT/bin:$PATH"
 eval "$(pyenv init -)"
 
 echo "Starting dictation..."
-cd /home/regevbr/Downloads/whisper-typer-tool
+cd "$(dirname "${BASH_SOURCE[0]}")"
 uv run whisper-typer-tool.py &
 disown
