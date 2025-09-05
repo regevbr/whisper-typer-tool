@@ -28,10 +28,10 @@ brew install ffmpeg portaudio python3
 # Install uv (if not already installed)
 pip install uv
 
-# Setup project with dependencies (preferred method)
-uv sync
+# Initialize project (first time setup)
+uv init
 
-# Alternative setup from requirements.txt
+# Setup project with dependencies (preferred method)
 uv add -r requirements.txt
 ```
 
@@ -82,12 +82,12 @@ python benchmark.py
 #### One-off Mode Configuration
 The main configuration is at whisper-typer-tool.py:7-8:
 - `WHISPER_MODEL`: Model size (tiny, base, small, medium, large)  
-- `SILENCE_THRESHOLD`: Seconds before auto-stop
+- `SILENCE_THRESHOLD`: Seconds before auto-stop (default: 4 seconds)
 
 #### Server Mode Configuration  
 The server configuration is at whisper-typer-server.py:11-13:
 - `WHISPER_MODEL`: Model size (tiny, base, small, medium, large)
-- `SILENCE_THRESHOLD`: Seconds before auto-stop  
+- `SILENCE_THRESHOLD`: Seconds before auto-stop (default: 4 seconds)
 - `HOTKEY`: Keyboard key for recording activation (default: Menu key)
 
 ## Architecture
