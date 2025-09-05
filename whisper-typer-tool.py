@@ -9,9 +9,10 @@ SILENCE_THRESHOLD = 4    # seconds before auto-stop
 
 def main():
     """Main entry point with proper resource management"""
+    print("Loading Whisper model...")
     try:
         with WhisperTyperApp(WHISPER_MODEL, SILENCE_THRESHOLD) as app:
-            app.run()
+            app.record_once()
     except KeyboardInterrupt:
         print("\n⚠️ Interrupted by user")
     except Exception as e:

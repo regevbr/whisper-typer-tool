@@ -13,6 +13,7 @@ This is a real-time voice-to-text typing tool that uses [RealtimeSTT](https://gi
 - **Cross-platform**: Works on Linux, Windows, and macOS
 - **Audio feedback**: Plays sounds when starting/stopping recording
 - **Live typing**: Incrementally types text at cursor position in any application
+- **Two operation modes**: One-off mode (immediate recording) and server mode (hotkey activation)
 
 ## Setup Instructions
 
@@ -44,11 +45,61 @@ pip install uv
 
     uv add -r requirements.txt
 
-**Step 5:**
+**Step 5 - Run in One-off Mode:**
 
     uv run whisper-typer-tool.py
 
-## Background Process Script
+**Step 5 - Run in Server Mode:**
+
+    uv run whisper-typer-server.py
+
+## Operation Modes
+
+### One-off Mode (Default)
+
+The traditional mode where the application starts recording immediately when executed and exits after completing one transcription session.
+
+**Usage:**
+```bash
+uv run whisper-typer-tool.py
+# or use the background script:
+./stt-toggle.sh
+```
+
+**Characteristics:**
+- Starts recording immediately
+- Exits after one transcription session  
+- Loads model each time it's run
+- Suitable for occasional use
+
+### Server Mode
+
+A persistent server that runs continuously in the background, pre-loads the Whisper model at startup, and waits for the Menu key to be pressed to start recording sessions.
+
+**Usage:**
+```bash
+uv run whisper-typer-server.py
+# or use the server script:
+./stt-server.sh
+```
+
+**Characteristics:**
+- Runs continuously in the background
+- Pre-loads Whisper model once at startup (faster subsequent recordings)
+- Press Menu key to start recording (toggles on/off)
+- Automatic silence detection stops each recording session
+- Can handle multiple recording sessions without restart
+- Press Ctrl+C to stop the server
+
+**Server Mode Benefits:**
+- **Faster response**: Model is pre-loaded, so recordings start instantly
+- **Better for frequent use**: No startup delay between sessions  
+- **Hotkey activation**: No need to run commands repeatedly
+- **Resource efficient**: Single persistent process instead of multiple startups
+
+## Background Process Scripts
+
+### One-off Mode Script
 
 For convenient keyboard shortcut access, use the included `stt-toggle.sh` script:
 
@@ -58,7 +109,28 @@ This script:
 - Runs the tool in the background (`&`)
 - Detaches it from the terminal (`disown`)
 
-### Setting Up Keyboard Shortcut
+### Server Mode Script
+
+For server mode, use the included `stt-server.sh` script:
+
+```bash
+./stt-server.sh
+```
+
+This script:
+- Sets up the Python environment (pyenv)
+- Changes to the script's directory automatically  
+- Starts the persistent server (does not detach)
+- Server continues running until manually stopped
+
+**Note**: The server script runs in the foreground. To run it in the background, use:
+```bash
+./stt-server.sh &
+```
+
+### Setting Up Keyboard Shortcuts
+
+#### For One-off Mode
 
 **Linux (GNOME):**
 1. Open Settings → Keyboard → Keyboard Shortcuts → Custom Shortcuts
@@ -86,3 +158,22 @@ This script:
 3. Menu Title: (leave blank)
 4. Keyboard Shortcut: Press desired combination
 5. Use Automator to create a service that runs the shell script
+
+#### For Server Mode
+
+Server mode uses the Menu key as the default hotkey for recording activation. Once the server is running:
+
+1. **Start the server**: Run `./stt-server.sh` or set up a system startup script
+2. **Recording activation**: Press the Menu key to start recording  
+3. **Automatic stop**: Recording stops after silence is detected
+4. **Multiple sessions**: Press Menu key again for additional recordings
+5. **Stop server**: Press Ctrl+C in the terminal where server is running
+
+**Custom Hotkey**: The hotkey can be modified in `whisper-typer-server.py` by changing the `HOTKEY` variable.
+
+**System Startup** (Optional):
+- **Linux**: Add `./stt-server.sh &` to your shell's startup script (`~/.bashrc`, `~/.profile`)
+- **Windows**: Add the server script to startup folder or create a Windows service
+- **macOS**: Use launchd or add to login items
+
+**Server Mode Recommendation**: Server mode is ideal for users who need voice typing frequently throughout the day, as it eliminates startup delays and provides instant activation via hotkey.

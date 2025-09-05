@@ -36,6 +36,8 @@ uv add -r requirements.txt
 ```
 
 ### Running the Application
+
+#### One-off Mode (Traditional)
 ```bash
 # Primary method with uv
 uv run whisper-typer-tool.py
@@ -43,6 +45,27 @@ uv run whisper-typer-tool.py
 # Alternative direct execution (if dependencies installed globally)
 python whisper-typer-tool.py
 
+# Background script for keyboard shortcuts
+./stt-toggle.sh
+```
+
+#### Server Mode (Persistent)
+```bash
+# Primary method with uv
+uv run whisper-typer-server.py
+
+# Alternative direct execution (if dependencies installed globally)
+python whisper-typer-server.py
+
+# Background server script
+./stt-server.sh
+
+# Background server script (detached)
+./stt-server.sh &
+```
+
+#### Testing and Benchmarking
+```bash
 # Run tests
 uv run run_tests.py
 # or
@@ -55,9 +78,17 @@ python benchmark.py
 ```
 
 ### Configuration Changes
+
+#### One-off Mode Configuration
 The main configuration is at whisper-typer-tool.py:7-8:
 - `WHISPER_MODEL`: Model size (tiny, base, small, medium, large)  
 - `SILENCE_THRESHOLD`: Seconds before auto-stop
+
+#### Server Mode Configuration  
+The server configuration is at whisper-typer-server.py:11-13:
+- `WHISPER_MODEL`: Model size (tiny, base, small, medium, large)
+- `SILENCE_THRESHOLD`: Seconds before auto-stop  
+- `HOTKEY`: Keyboard key for recording activation (default: Menu key)
 
 ## Architecture
 
@@ -65,17 +96,43 @@ The main configuration is at whisper-typer-tool.py:7-8:
 
 The application is now organized into several modules for better maintainability:
 
-1. **whisper-typer-tool.py**: Main entry point with configuration
-2. **app.py**: WhisperTyperApp class with proper resource management
-3. **audio.py**: AudioManager class for non-blocking audio playback
-4. **text_typing.py**: TypeController class with intelligent text correction
-5. **transcription.py**: TranscriptionHandler class with GPU/CPU auto-detection
+1. **whisper-typer-tool.py**: Main entry point for one-off mode
+2. **whisper-typer-server.py**: Server mode entry point with persistent operation
+3. **app.py**: WhisperTyperApp class with proper resource management (supports both modes)
+4. **audio.py**: AudioManager class for non-blocking audio playback
+5. **text_typing.py**: TypeController class with intelligent text correction
+6. **transcription.py**: TranscriptionHandler class with GPU/CPU auto-detection
 
 #### Key Components:
 - **AudioManager**: Handles audio playback with pre-initialization and threading
 - **TypeController**: Manages text typing with difflib-based corrections and debouncing  
 - **TranscriptionHandler**: Configures Whisper models with optimal device detection
-- **WhisperTyperApp**: Coordinates all components with proper resource cleanup
+- **WhisperTyperApp**: Coordinates all components with proper resource cleanup (supports both one-off and server modes)
+
+### Server Mode Architecture
+
+Server mode introduces a persistent application architecture optimized for frequent use:
+
+#### Additional Server Components:
+- **WhisperTyperServer**: Main server class managing hotkey listening and recording coordination
+- **Global Hotkey Listener**: Uses pynput to detect Menu key presses system-wide
+- **Threading Coordination**: Separate threads for hotkey listening and recording operations
+- **Persistent Model**: Pre-loaded Whisper model shared across multiple recording sessions
+- **Signal Handlers**: Graceful shutdown handling for SIGINT/SIGTERM
+
+#### Server Mode Operational Flow:
+1. **Initialization**: Server loads Whisper model once and creates persistent recorder
+2. **Idle State**: Global hotkey listener waits for Menu key press
+3. **Recording Activation**: Menu key triggers recording session in separate thread  
+4. **Recording Session**: Uses persistent recorder with real-time transcription and typing
+5. **Auto-Stop**: Silence detection ends session, returns to idle state
+6. **Resource Persistence**: Model and components remain loaded for next session
+7. **Graceful Shutdown**: Signal handlers ensure proper cleanup on exit
+
+#### Performance Benefits:
+- **Instant Activation**: No model loading delay (typically 2-5 seconds saved per use)
+- **Memory Efficiency**: Single persistent process vs. multiple short-lived processes
+- **Resource Optimization**: Shared GPU/CPU resources across recording sessions
 
 ### RealtimeSTT Integration Pattern
 
