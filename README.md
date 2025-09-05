@@ -177,3 +177,7 @@ Server mode uses the Menu key as the default hotkey for recording activation. On
 - **macOS**: Use launchd or add to login items
 
 **Server Mode Recommendation**: Server mode is ideal for users who need voice typing frequently throughout the day, as it eliminates startup delays and provides instant activation via hotkey.
+
+## Acknowledgments
+
+This project is forked from [dynamiccreator/whisper-typer-tool](https://github.com/dynamiccreator/whisper-typer-tool) and includes enhancements for improved functionality and user experience.
